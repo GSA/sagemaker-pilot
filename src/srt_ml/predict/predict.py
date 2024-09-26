@@ -20,7 +20,7 @@ class Predict():
         data (list): a list of dicts, with each dict representing an opportunity.
     '''
 
-    def __init__(self, data, best_model_path=Path(binary_path, 'estimator.pkl')):
+    def __init__(self, best_model_path=Path(binary_path, 'estimator.pkl'), data=None):
         self.data = data
         cwd = os.getcwd()
         if 'fbo-scraper' in cwd:
@@ -31,6 +31,14 @@ class Predict():
             root_path = cwd
         self.best_model_path = os.path.join(root_path, best_model_path)
 
+        self._model = None
+
+    @property
+    def model(self):
+        if self._model is None:
+            with open(self.best_model_path, 'rb') as f:
+                self._model = pickle.load(f)
+        return self._model
 
     @staticmethod
     def transform_text(doc):
@@ -88,8 +96,7 @@ class Predict():
             json_data (dict): a Python dict representing the updated json data
         '''
 
-        with open(self.best_model_path, 'rb') as f:
-            pickled_model = pickle.load(f)
+        pickled_model = self.model
         data = self.data
         for opp in data:
             opp['compliant'] = 0 #noncompliant until proven otherwise
@@ -99,7 +106,7 @@ class Predict():
                 stats = {"chars": [], "prediction": [], "decision boundry": [], "raw prediction": [] }
                 for attachment in attachments:
                     text = attachment['text']
-                    if re.match('^.?This notice contains link\(s\)',text):
+                    if re.match(r'^.?This notice contains link\(s\)',text):
                         logger.warning("Notice {} - {} has suspicious attachment text.".format(opp['solnbr'], opp.get('agency', '') ),
                                      extra={
                                          'text': text[:1024],
@@ -138,3 +145,29 @@ class Predict():
                     logger.log(level=16, msg="Notice {} {} is predectied to be not compliant".format(opp['agency'], opp['solnbr']) )
 
         return data
+
+
+    def process_file(self, file_path):
+        with open(file_path, 'r', errors='ignore') as f:
+            text = f.read()
+        
+        # Fix: Use a raw string for the regular expression
+        if re.match(r'^.?This notice contains link\(s\)', text):
+            logger.warning(f"File {file_path} has suspicious text.")
+
+        normalized_text = [self.transform_text(text)]
+        
+        pickled_model = self.model
+        
+        raw_prediction = pickled_model.predict(normalized_text)[0]
+        pred = int(raw_prediction)
+        
+        return pred == 1  # 1 is compliant, 0 is non-compliant
+
+    def process_multiple_files(self, file_paths):
+        results = {}
+        for file_path in file_paths:
+            filename = os.path.basename(file_path)
+            is_compliant = self.process_file(file_path)
+            results[filename] = is_compliant
+        return results
