@@ -9,6 +9,8 @@ from nltk.stem.porter import PorterStemmer
 import logging
 from pathlib import Path
 from srt_ml.binaries import binary_path
+from .get_doc_text import get_doc_text
+
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +150,7 @@ class Predict():
 
 
     def process_file(self, file_path):
-        with open(file_path, 'r', errors='ignore') as f:
-            text = f.read()
+        text = get_doc_text(file_path)
         
         # Fix: Use a raw string for the regular expression
         if re.match(r'^.?This notice contains link\(s\)', text):
