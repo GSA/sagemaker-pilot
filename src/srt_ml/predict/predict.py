@@ -31,7 +31,11 @@ class Predict():
         else:
             i = cwd.find('root')
             root_path = cwd
-        self.best_model_path = os.path.join(root_path, best_model_path)
+
+        if isinstance(best_model_path, Path):
+            self.best_model_path = best_model_path
+        else:
+            self.best_model_path = os.path.join(binary_path, best_model_path)
 
         self._model = None
 
@@ -150,7 +154,7 @@ class Predict():
 
 
     def process_file(self, file_path):
-        text = get_doc_text(file_path)
+        text = get_doc_text(file_path, rm=True)
         
         # Fix: Use a raw string for the regular expression
         if re.match(r'^.?This notice contains link\(s\)', text):
